@@ -456,6 +456,20 @@ static inline void kvm_vm_clear_dirty_log(struct kvm_vm *vm, int slot, void *log
 	vm_ioctl(vm, KVM_CLEAR_DIRTY_LOG, &args);
 }
 
+static inline void kvm_signal_msi(struct kvm_vm *vm, uint64_t address,
+				  uint32_t data)
+{
+	struct kvm_msi msi;
+
+	msi.address_lo = (uint32_t)address;
+	msi.address_hi = address >> 32;
+	msi.data = data;
+	msi.flags = 0;
+	memset(msi.pad, 0, sizeof(msi.pad));
+
+	TEST_ASSERT_EQ(__vm_ioctl(vm, KVM_SIGNAL_MSI, &msi), 1);
+}
+
 static inline uint32_t kvm_vm_reset_dirty_ring(struct kvm_vm *vm)
 {
 	return __vm_ioctl(vm, KVM_RESET_DIRTY_RINGS, NULL);
