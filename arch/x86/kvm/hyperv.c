@@ -971,6 +971,7 @@ int kvm_hv_vcpu_init(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.hyperv = hv_vcpu;
 	hv_vcpu->vcpu = vcpu;
+	hv_vcpu->waiting_on = -1;
 
 	synic_init(&hv_vcpu->synic);
 
@@ -3061,6 +3062,39 @@ void dump_ftrace_vcpu_hyperv(struct kvm_vcpu *vcpu)
 	trace_printk("*** HyperV VTL state ***\n");
 	if (hv_read_vtl_control(vcpu, &vtl_control))
 		trace_printk("entry_reason 0x%x, vina %d, rax %llx, rcx %llx\n",
-			     vtl_control.vtl_entry_reason, vtl_control.vina_asserted,
-			     vtl_control.vtl_ret_x64rax, vtl_control.vtl_ret_x64rcx);
+			     vtl_control.vtl_entry_reason,
+			     vtl_control.vina_asserted,
+			     vtl_control.vtl_ret_x64rax,
+			     vtl_control.vtl_ret_x64rcx);
+}
+
+void kvm_hv_vcpu_suspend_tlb_flush(struct kvm_vcpu *vcpu, int vcpu_id)
+{
+	/*
+	 * Order is important here, so that the unsuspension function always
+	 * knows what vCPU is waited on when suspended
+	 */
+	WRITE_ONCE(vcpu->arch.hyperv->waiting_on, vcpu_id);
+	WRITE_ONCE(vcpu->arch.hyperv->suspended, true);
+}
+
+void kvm_hv_vcpu_unsuspend_tlb_flush(struct kvm_vcpu *vcpu)
+{
+	DECLARE_BITMAP(vcpu_mask, KVM_MAX_VCPUS);
+	struct kvm_vcpu_hv *vcpu_hv;
+	struct kvm_vcpu *v;
+	unsigned long i;
+
+	kvm_for_each_vcpu(i, v, vcpu->kvm) {
+		vcpu_hv = to_hv_vcpu(v);
+
+		if (kvm_hv_vcpu_suspended(v) &&
+		    READ_ONCE(vcpu_hv->waiting_on) == vcpu->vcpu_id) {
+			WRITE_ONCE(v->arch.hyperv->waiting_on, -1);
+			WRITE_ONCE(v->arch.hyperv->suspended, false);
+			__set_bit(i, vcpu_mask);
+		}
+	}
+
+	kvm_make_vcpus_request_mask(vcpu->kvm, KVM_REQ_EVENT, vcpu_mask);
 }

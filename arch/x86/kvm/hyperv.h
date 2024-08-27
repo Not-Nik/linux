@@ -276,6 +276,15 @@ static inline bool kvm_hv_vcpu_is_idle_vtl(struct kvm_vcpu *vcpu)
 	return vcpu->arch.mp_state == KVM_MP_STATE_HV_INACTIVE_VTL;
 }
 void dump_ftrace_vcpu_hyperv(struct kvm_vcpu *vcpu);
+
+static inline bool kvm_hv_vcpu_suspended(struct kvm_vcpu *vcpu)
+{
+	return vcpu->arch.hyperv_enabled &&
+	       READ_ONCE(vcpu->arch.hyperv->suspended);
+}
+
+void kvm_hv_vcpu_suspend_tlb_flush(struct kvm_vcpu *vcpu, int vcpu_id);
+void kvm_hv_vcpu_unsuspend_tlb_flush(struct kvm_vcpu *vcpu);
 #else /* CONFIG_KVM_HYPERV */
 static inline void kvm_hv_setup_tsc_page(struct kvm *kvm,
 					 struct pvclock_vcpu_time_info *hv_clock) {}
@@ -340,6 +349,14 @@ static inline bool kvm_hv_vcpu_is_idle_vtl(struct kvm_vcpu *vcpu)
 {
 	return false;
 }
+
+static inline bool kvm_hv_vcpu_suspended(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
+static inline void kvm_hv_vcpu_suspend_tlb_flush(struct kvm_vcpu *vcpu, int vcpu_id) {}
+static inline void kvm_hv_vcpu_unsuspend_tlb_flush(struct kvm_vcpu *vcpu) {}
 #endif /* CONFIG_KVM_HYPERV */
 
 #endif /* __ARCH_X86_KVM_HYPERV_H__ */
