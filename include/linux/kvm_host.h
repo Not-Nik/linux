@@ -2449,6 +2449,19 @@ static inline unsigned long kvm_get_memory_attributes(struct kvm *kvm, gfn_t gfn
 	return xa_to_value(xa_load(&kvm->mem_attrs.array, gfn));
 }
 
+static inline bool kvm_gfn_has_memory_protections(struct kvm *kvm, gfn_t gfn)
+{
+	uint64_t mask = KVM_MEMORY_ATTRIBUTE_NR | KVM_MEMORY_ATTRIBUTE_NW |
+			KVM_MEMORY_ATTRIBUTE_NX;
+	uint64_t attrs;
+
+	attrs = kvm_get_memory_attributes(kvm, gfn);
+	if (!attrs)
+		return false;
+
+	return !!(attrs & mask);
+}
+
 static inline int kvm_memory_attributes_read_allowed(struct kvm *kvm, gfn_t gfn)
 {
 	unsigned long attrs;
@@ -2531,6 +2544,10 @@ static inline bool kvm_memory_attributes_changed(struct kvm *kvm, u64 generation
 static inline u64 kvm_memory_attributes_generation(struct kvm *kvm)
 {
 	return 0;
+}
+static inline bool kvm_gfn_has_memory_protections(struct kvm *kvm, gfn_t gfn)
+{
+	return false;
 }
 static inline int kvm_memory_attributes_read_allowed(struct kvm *kvm, gfn_t gfn)
 {
